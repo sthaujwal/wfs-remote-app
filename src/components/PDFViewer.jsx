@@ -389,10 +389,21 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                               }
                             };
                             
+<<<<<<< HEAD
                             const leftPercent = field.xPercent ?? 0;
                             const topPercent = field.yPercent ?? 0;
                             const widthPercent = field.widthPercent ?? 25;
                             const heightPercent = field.heightPercent ?? 6;
+||||||| 6639c3f
+                            // Use percentage-based positioning - these percentages are relative to containerRef
+                            const leftPercent = field.xPercent !== undefined ? field.xPercent : (field.x / 800) * 100;
+                            const topPercent = field.yPercent !== undefined ? field.yPercent : (field.y / 600) * 100;
+=======
+                            const leftPercent = field.xPercent || 0;
+                            const topPercent = field.yPercent || 0;
+                            const widthPercent = field.widthPercent || 25;
+                            const heightPercent = field.heightPercent || 5;
+>>>>>>> origin/main
                             
                             return (
                               <div
