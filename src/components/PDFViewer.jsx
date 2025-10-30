@@ -93,50 +93,46 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       const offset = monitor.getClientOffset();
       if (!offset) return;
       
-      // Calculate position relative to containerRef - this is our single source of truth
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const x = offset.x - containerRect.left;
-      const y = offset.y - containerRect.top;
+      const canvas = containerRef.current.querySelector('.react-pdf__Page canvas');
+      const rect = canvas?.getBoundingClientRect() ?? containerRef.current.getBoundingClientRect();
       
-      // Get container dimensions - these should match the overlay exactly
-      const containerWidth = containerRect.width;
-      const containerHeight = containerRect.height;
-      
-      // Validate bounds
-      if (x < 0 || y < 0 || x > containerWidth || y > containerHeight) {
-        return; // Drop was outside the container
+      if (!rect?.width || !rect?.height) {
+        console.warn('Cannot drop: PDF canvas has no dimensions');
+        return;
       }
       
-      if (containerWidth > 0 && containerHeight > 0) {
-        const fieldWidthPx = 200;
-        const fieldHeightPx = 40;
-        
-        const fieldWidthPercent = (fieldWidthPx / containerWidth) * 100;
-        const fieldHeightPercent = (fieldHeightPx / containerHeight) * 100;
-        
-        const xPercent = (x / containerWidth) * 100;
-        const yPercent = (y / containerHeight) * 100;
-        
-        const maxXPercent = Math.max(0, 100 - fieldWidthPercent);
-        const maxYPercent = Math.max(0, 100 - fieldHeightPercent);
-        const clampedXPercent = Math.max(0, Math.min(xPercent, maxXPercent));
-        const clampedYPercent = Math.max(0, Math.min(yPercent, maxYPercent));
-        
-        const newField = {
-          id: Date.now(),
-          type: item.type,
-          xPercent: clampedXPercent,
-          yPercent: clampedYPercent,
-          widthPercent: fieldWidthPercent,
-          heightPercent: fieldHeightPercent,
-          page: pageNumber,
-          label: getFieldLabel(item.type),
-          value: '',
-          required: false
-        };
-        
-        onFieldAdd(newField);
+      const x = offset.x - rect.left;
+      const y = offset.y - rect.top;
+      
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+        return;
       }
+      
+      const xPercent = (x / rect.width) * 100;
+      const yPercent = (y / rect.height) * 100;
+      
+      const widthPercent = 25;
+      const heightPercent = 6;
+      
+      const maxXPercent = Math.max(0, 100 - widthPercent);
+      const maxYPercent = Math.max(0, 100 - heightPercent);
+      const clampedXPercent = Math.min(Math.max(xPercent, 0), maxXPercent);
+      const clampedYPercent = Math.min(Math.max(yPercent, 0), maxYPercent);
+      
+      const newField = {
+        id: Date.now(),
+        type: item.type,
+        xPercent: clampedXPercent,
+        yPercent: clampedYPercent,
+        widthPercent: widthPercent,
+        heightPercent: heightPercent,
+        page: pageNumber,
+        label: getFieldLabel(item.type),
+        value: '',
+        required: false
+      };
+      
+      onFieldAdd(newField);
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -393,10 +389,21 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                               }
                             };
                             
+<<<<<<< HEAD
+                            const leftPercent = field.xPercent ?? 0;
+                            const topPercent = field.yPercent ?? 0;
+                            const widthPercent = field.widthPercent ?? 25;
+                            const heightPercent = field.heightPercent ?? 6;
+||||||| 6639c3f
+                            // Use percentage-based positioning - these percentages are relative to containerRef
+                            const leftPercent = field.xPercent !== undefined ? field.xPercent : (field.x / 800) * 100;
+                            const topPercent = field.yPercent !== undefined ? field.yPercent : (field.y / 600) * 100;
+=======
                             const leftPercent = field.xPercent || 0;
                             const topPercent = field.yPercent || 0;
                             const widthPercent = field.widthPercent || 25;
                             const heightPercent = field.heightPercent || 5;
+>>>>>>> origin/main
                             
                             return (
                               <div
