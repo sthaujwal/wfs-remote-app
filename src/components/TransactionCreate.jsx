@@ -735,6 +735,7 @@ const TransactionCreate = () => {
                 onFieldAdd={handleFieldAdd}
                 onFieldUpdate={handleFieldUpdate}
                 onFieldDelete={handleFieldDelete}
+                recipients={recipients}
               />
             </div>
           </div>
