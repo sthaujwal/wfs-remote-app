@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useDrop } from 'react-dnd';
+import { useDrop, useDrag } from 'react-dnd';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { 
   FileText, 
@@ -23,14 +23,16 @@ if (typeof window !== 'undefined' && 'Worker' in window) {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
-const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete }) => {
+const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete, recipients = [] }) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [numPages, setNumPages] = useState(null);
   const [scale, setScale] = useState(1.2);
   const [fileUrl, setFileUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showRecipientSelector, setShowRecipientSelector] = useState(null);
   const containerRef = useRef(null);
+  const overlayRef = useRef(null);
 
   // Create object URL when file changes
   React.useEffect(() => {
@@ -86,18 +88,16 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
   };
 
   const [{ isOver }, drop] = useDrop({
-    accept: ['signature', 'text', 'date', 'email', 'phone', 'address', 'radio', 'checkbox'],
+    accept: ['signature', 'text', 'date', 'email', 'phone', 'address', 'radio', 'checkbox', 'EXISTING_FIELD'],
     drop: (item, monitor) => {
-      if (!containerRef.current) return;
+      if (!overlayRef.current) return;
       
       const offset = monitor.getClientOffset();
       if (!offset) return;
       
-      const canvas = containerRef.current.querySelector('.react-pdf__Page canvas');
-      const rect = canvas?.getBoundingClientRect() ?? containerRef.current.getBoundingClientRect();
+      const rect = overlayRef.current.getBoundingClientRect();
       
       if (!rect?.width || !rect?.height) {
-        console.warn('Cannot drop: PDF canvas has no dimensions');
         return;
       }
       
@@ -111,6 +111,10 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       const xPercent = (x / rect.width) * 100;
       const yPercent = (y / rect.height) * 100;
       
+      if (!Number.isFinite(xPercent) || !Number.isFinite(yPercent)) {
+        return;
+      }
+      
       const widthPercent = 25;
       const heightPercent = 6;
       
@@ -119,20 +123,29 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       const clampedXPercent = Math.min(Math.max(xPercent, 0), maxXPercent);
       const clampedYPercent = Math.min(Math.max(yPercent, 0), maxYPercent);
       
-      const newField = {
-        id: Date.now(),
-        type: item.type,
-        xPercent: clampedXPercent,
-        yPercent: clampedYPercent,
-        widthPercent: widthPercent,
-        heightPercent: heightPercent,
-        page: pageNumber,
-        label: getFieldLabel(item.type),
-        value: '',
-        required: false
-      };
-      
-      onFieldAdd(newField);
+      if (item.fieldType === 'existing') {
+        onFieldUpdate(item.id, {
+          ...fields.find(f => f.id === item.id),
+          xPercent: clampedXPercent,
+          yPercent: clampedYPercent
+        });
+      } else {
+        const newField = {
+          id: Date.now(),
+          type: item.type,
+          xPercent: clampedXPercent,
+          yPercent: clampedYPercent,
+          widthPercent: widthPercent,
+          heightPercent: heightPercent,
+          page: pageNumber,
+          label: getFieldLabel(item.type),
+          value: '',
+          required: false,
+          recipientId: null
+        };
+        
+        onFieldAdd(newField);
+      }
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -165,6 +178,22 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       checkbox: Square
     };
     return icons[type] || FileText;
+  };
+
+  const getRecipientColor = (recipientId) => {
+    if (!recipientId) return null;
+    const colors = [
+      'border-blue-500 bg-blue-50',
+      'border-green-500 bg-green-50',
+      'border-purple-500 bg-purple-50',
+      'border-orange-500 bg-orange-50',
+      'border-pink-500 bg-pink-50',
+      'border-teal-500 bg-teal-50',
+      'border-indigo-500 bg-indigo-50',
+      'border-red-500 bg-red-50'
+    ];
+    const index = recipients.findIndex(r => r.id === recipientId);
+    return index >= 0 ? colors[index % colors.length] : null;
   };
 
   const handleFieldClick = (field) => {
@@ -344,10 +373,7 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                     >
                         {/* Single container that wraps both PDF Page and overlay - this ensures coordinate system matches */}
                         <div 
-                          ref={(node) => {
-                            containerRef.current = node;
-                            drop(node);
-                          }}
+                          ref={containerRef}
                           style={{ 
                             position: 'relative', 
                             display: 'inline-block'
@@ -364,10 +390,14 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                           
                           {/* Overlay that matches container exactly - fields rendered here */}
                           <div 
+                            ref={(node) => {
+                              overlayRef.current = node;
+                              drop(node);
+                            }}
                             className="absolute inset-0" 
                             style={{ 
                               zIndex: 10, 
-                              pointerEvents: 'none',
+                              pointerEvents: 'auto',
                               position: 'absolute',
                               top: 0,
                               left: 0,
@@ -378,6 +408,11 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                           {pageFields.map((field) => {
                             const Icon = getFieldIcon(field.type);
                             const getFieldStyling = (field) => {
+                              const recipientColor = getRecipientColor(field.recipientId);
+                              if (recipientColor) {
+                                return recipientColor;
+                              }
+                              
                               if (field.type === 'signature') {
                                 return field.value ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50';
                               } else if (field.type === 'radio') {
@@ -389,25 +424,37 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                               }
                             };
                             
-                            // Use percentage-based positioning - these percentages are relative to containerRef
-                            const leftPercent = field.xPercent !== undefined ? field.xPercent : (field.x / 800) * 100;
-                            const topPercent = field.yPercent !== undefined ? field.yPercent : (field.y / 600) * 100;
+                            const leftPercent = field.xPercent ?? 0;
+                            const topPercent = field.yPercent ?? 0;
+                            const widthPercent = field.widthPercent ?? 25;
+                            const heightPercent = field.heightPercent ?? 6;
                             
-                            return (
+                            const FieldComponent = () => {
+                              const [{ isDragging }, drag] = useDrag({
+                                type: 'EXISTING_FIELD',
+                                item: { id: field.id, fieldType: 'existing' },
+                                collect: (monitor) => ({
+                                  isDragging: monitor.isDragging(),
+                                }),
+                              });
+                              
+                              return (
                               <div
+                                ref={drag}
                                 key={field.id}
-                                className={`absolute border-2 border-dashed cursor-pointer transition-all hover:shadow-md group ${getFieldStyling(field)}`}
+                                className={`absolute border-2 border-dashed cursor-move transition-all hover:shadow-md group ${getFieldStyling(field)}`}
                                 style={{
                                   left: `${leftPercent}%`,
                                   top: `${topPercent}%`,
-                                  width: field.width || 200,
-                                  height: field.height || 40,
+                                  width: `${widthPercent}%`,
+                                  height: `${heightPercent}%`,
                                   zIndex: 20,
-                                  pointerEvents: 'auto'
+                                  pointerEvents: 'auto',
+                                  opacity: isDragging ? 0.5 : 1
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleFieldClick(field);
+                                  setShowRecipientSelector(showRecipientSelector === field.id ? null : field.id);
                                 }}
                               >
                                 <div className="flex items-center justify-between h-full p-2">
@@ -450,8 +497,48 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                                     )}
                                   </div>
                                 )}
+                                
+                                {showRecipientSelector === field.id && recipients.length > 0 && (
+                                  <div 
+                                    className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-[200px]"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="p-2 border-b border-gray-200 bg-gray-50">
+                                      <span className="text-xs font-semibold text-gray-700">Assign to Recipient</span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                      <button
+                                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-b border-gray-100"
+                                        onClick={() => {
+                                          onFieldUpdate(field.id, { ...field, recipientId: null });
+                                          setShowRecipientSelector(null);
+                                        }}
+                                      >
+                                        <span className="text-gray-500">Unassigned</span>
+                                      </button>
+                                      {recipients.map((recipient) => (
+                                        <button
+                                          key={recipient.id}
+                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-b border-gray-100 ${
+                                            field.recipientId === recipient.id ? 'bg-blue-50' : ''
+                                          }`}
+                                          onClick={() => {
+                                            onFieldUpdate(field.id, { ...field, recipientId: recipient.id });
+                                            setShowRecipientSelector(null);
+                                          }}
+                                        >
+                                          <div className="font-medium text-gray-900">{recipient.name}</div>
+                                          <div className="text-gray-500">{recipient.email}</div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            );
+                              );
+                            };
+                            
+                            return <FieldComponent key={field.id} />;
                           })}
                           </div>
                         
