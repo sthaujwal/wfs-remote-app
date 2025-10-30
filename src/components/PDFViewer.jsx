@@ -44,12 +44,12 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
     }
   }, [file]);
 
-  // Sync containerRef size with rendered Page dimensions
+  // Sync containerRef size with rendered Page dimensions using ResizeObserver
   React.useEffect(() => {
     if (!containerRef.current) return;
     
     const updateContainerSize = () => {
-      const pageElement = containerRef.current.querySelector('.react-pdf__Page, canvas');
+      const pageElement = containerRef.current?.querySelector('.react-pdf__Page canvas');
       if (pageElement && containerRef.current) {
         const pageRect = pageElement.getBoundingClientRect();
         if (pageRect.width && pageRect.height) {
@@ -59,14 +59,19 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       }
     };
     
-    // Update after Page renders
-    const timers = [
-      setTimeout(updateContainerSize, 100),
-      setTimeout(updateContainerSize, 500),
-      setTimeout(updateContainerSize, 1000)
-    ];
+    const pageElement = containerRef.current.querySelector('.react-pdf__Page canvas');
+    if (pageElement) {
+      const resizeObserver = new ResizeObserver(() => {
+        updateContainerSize();
+      });
+      
+      resizeObserver.observe(pageElement);
+      updateContainerSize(); // Initial update
+      
+      return () => resizeObserver.disconnect();
+    }
     
-    return () => timers.forEach(timer => clearTimeout(timer));
+    updateContainerSize();
   }, [pageNumber, scale, numPages, fileUrl]);
 
   const onDocumentLoadSuccess = ({ numPages }) => {
@@ -88,52 +93,46 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       const offset = monitor.getClientOffset();
       if (!offset) return;
       
-      // Calculate position relative to containerRef - this is our single source of truth
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const x = offset.x - containerRect.left;
-      const y = offset.y - containerRect.top;
+      const canvas = containerRef.current.querySelector('.react-pdf__Page canvas');
+      const rect = canvas?.getBoundingClientRect() ?? containerRef.current.getBoundingClientRect();
       
-      // Get container dimensions - these should match the overlay exactly
-      const containerWidth = containerRect.width;
-      const containerHeight = containerRect.height;
-      
-      // Validate bounds
-      if (x < 0 || y < 0 || x > containerWidth || y > containerHeight) {
-        return; // Drop was outside the container
+      if (!rect?.width || !rect?.height) {
+        console.warn('Cannot drop: PDF canvas has no dimensions');
+        return;
       }
       
-      if (containerWidth > 0 && containerHeight > 0) {
-        // Calculate percentage-based positioning - relative to container which matches overlay
-        const xPercent = (x / containerWidth) * 100;
-        const yPercent = (y / containerHeight) * 100;
-        
-        // Ensure the field is positioned within bounds (accounting for field size)
-        const fieldWidth = 200;
-        const fieldHeight = 40;
-        const fieldWidthPercent = (fieldWidth / containerWidth) * 100;
-        const fieldHeightPercent = (fieldHeight / containerHeight) * 100;
-        const maxXPercent = Math.max(0, 100 - fieldWidthPercent);
-        const maxYPercent = Math.max(0, 100 - fieldHeightPercent);
-        const clampedXPercent = Math.max(0, Math.min(xPercent, maxXPercent));
-        const clampedYPercent = Math.max(0, Math.min(yPercent, maxYPercent));
-        
-        const newField = {
-          id: Date.now(),
-          type: item.type,
-          x: x,
-          y: y,
-          xPercent: clampedXPercent,
-          yPercent: clampedYPercent,
-          page: pageNumber,
-          width: fieldWidth,
-          height: fieldHeight,
-          label: getFieldLabel(item.type),
-          value: '',
-          required: false
-        };
-        
-        onFieldAdd(newField);
+      const x = offset.x - rect.left;
+      const y = offset.y - rect.top;
+      
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+        return;
       }
+      
+      const xPercent = (x / rect.width) * 100;
+      const yPercent = (y / rect.height) * 100;
+      
+      const widthPercent = 25;
+      const heightPercent = 6;
+      
+      const maxXPercent = Math.max(0, 100 - widthPercent);
+      const maxYPercent = Math.max(0, 100 - heightPercent);
+      const clampedXPercent = Math.min(Math.max(xPercent, 0), maxXPercent);
+      const clampedYPercent = Math.min(Math.max(yPercent, 0), maxYPercent);
+      
+      const newField = {
+        id: Date.now(),
+        type: item.type,
+        xPercent: clampedXPercent,
+        yPercent: clampedYPercent,
+        widthPercent: widthPercent,
+        heightPercent: heightPercent,
+        page: pageNumber,
+        label: getFieldLabel(item.type),
+        value: '',
+        required: false
+      };
+      
+      onFieldAdd(newField);
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -226,26 +225,61 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <button
+              onClick={() => setScale(1.0)}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 font-medium"
+              title="Actual Size (100%)"
+            >
+              100%
+            </button>
+            <button
+              onClick={() => setScale(1.5)}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 font-medium"
+              title="Fit Width"
+            >
+              Fit
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
               onClick={() => setScale(Math.max(0.5, scale - 0.1))}
               className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              title="Zoom Out"
             >
               -
             </button>
-            <span className="text-sm text-gray-600 w-12 text-center">
-              {Math.round(scale * 100)}%
-            </span>
+            <input
+              type="number"
+              value={Math.round(scale * 100)}
+              onChange={(e) => {
+                const newScale = parseInt(e.target.value) / 100;
+                if (newScale >= 0.5 && newScale <= 2.0) {
+                  setScale(newScale);
+                }
+              }}
+              className="w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-wells-fargo-red"
+              min="50"
+              max="200"
+            />
+            <span className="text-xs text-gray-500">%</span>
             <button
               onClick={() => setScale(Math.min(2.0, scale + 0.1))}
               className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              title="Zoom In"
             >
               +
             </button>
           </div>
           <div className="flex items-center space-x-2">
-            <button className="p-2 text-gray-400 hover:text-gray-600">
+            <button 
+              className="p-2 text-gray-400 hover:text-gray-600"
+              title="Preview Mode"
+            >
               <Eye className="h-4 w-4" />
             </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600">
+            <button 
+              className="p-2 text-gray-400 hover:text-gray-600"
+              title="Download PDF"
+            >
               <Download className="h-4 w-4" />
             </button>
           </div>
@@ -355,9 +389,10 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                               }
                             };
                             
-                            // Use percentage-based positioning - these percentages are relative to containerRef
-                            const leftPercent = field.xPercent !== undefined ? field.xPercent : (field.x / 800) * 100;
-                            const topPercent = field.yPercent !== undefined ? field.yPercent : (field.y / 600) * 100;
+                            const leftPercent = field.xPercent ?? 0;
+                            const topPercent = field.yPercent ?? 0;
+                            const widthPercent = field.widthPercent ?? 25;
+                            const heightPercent = field.heightPercent ?? 6;
                             
                             return (
                               <div
@@ -366,8 +401,8 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                                 style={{
                                   left: `${leftPercent}%`,
                                   top: `${topPercent}%`,
-                                  width: field.width || 200,
-                                  height: field.height || 40,
+                                  width: `${widthPercent}%`,
+                                  height: `${heightPercent}%`,
                                   zIndex: 20,
                                   pointerEvents: 'auto'
                                 }}
@@ -436,10 +471,16 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                 </div>
               </div>
           ) : (
-            <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-              <div className="text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <p className="text-gray-500">No PDF file loaded</p>
+            <div className="flex items-center justify-center h-96 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border-2 border-dashed border-gray-300">
+              <div className="text-center p-8">
+                <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">No Document Loaded</h3>
+                <p className="text-sm text-gray-500 mb-4">Upload a PDF document to start adding form fields</p>
+                <div className="text-xs text-gray-400">
+                  <p>• Drag fields from the left palette</p>
+                  <p>• Drop them onto the PDF pages</p>
+                  <p>• Click fields to edit their values</p>
+                </div>
               </div>
             </div>
           )}
