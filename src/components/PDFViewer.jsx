@@ -31,6 +31,7 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const containerRef = useRef(null);
+  const overlayRef = useRef(null);
 
   // Create object URL when file changes
   React.useEffect(() => {
@@ -88,23 +89,29 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
   const [{ isOver }, drop] = useDrop({
     accept: ['signature', 'text', 'date', 'email', 'phone', 'address', 'radio', 'checkbox'],
     drop: (item, monitor) => {
-      if (!containerRef.current) return;
+      if (!overlayRef.current) return;
       
       const offset = monitor.getClientOffset();
       if (!offset) return;
       
-      const canvas = containerRef.current.querySelector('.react-pdf__Page canvas');
-      const rect = canvas?.getBoundingClientRect() ?? containerRef.current.getBoundingClientRect();
+      const rect = overlayRef.current.getBoundingClientRect();
       
       if (!rect?.width || !rect?.height) {
-        console.warn('Cannot drop: PDF canvas has no dimensions');
+        console.warn('Cannot drop: overlay has no dimensions');
         return;
       }
       
       const x = offset.x - rect.left;
       const y = offset.y - rect.top;
       
+      console.log('Drop coordinates:', { 
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        offset: { x: offset.x, y: offset.y },
+        relative: { x, y }
+      });
+      
       if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+        console.warn('Drop outside bounds');
         return;
       }
       
@@ -119,6 +126,11 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
       const clampedXPercent = Math.min(Math.max(xPercent, 0), maxXPercent);
       const clampedYPercent = Math.min(Math.max(yPercent, 0), maxYPercent);
       
+      console.log('Computed percentages:', {
+        xPercent, yPercent,
+        clamped: { xPercent: clampedXPercent, yPercent: clampedYPercent }
+      });
+      
       const newField = {
         id: Date.now(),
         type: item.type,
@@ -132,6 +144,7 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
         required: false
       };
       
+      console.log('Adding field:', newField);
       onFieldAdd(newField);
     },
     collect: (monitor) => ({
@@ -344,10 +357,7 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                     >
                         {/* Single container that wraps both PDF Page and overlay - this ensures coordinate system matches */}
                         <div 
-                          ref={(node) => {
-                            containerRef.current = node;
-                            drop(node);
-                          }}
+                          ref={containerRef}
                           style={{ 
                             position: 'relative', 
                             display: 'inline-block'
@@ -364,10 +374,14 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                           
                           {/* Overlay that matches container exactly - fields rendered here */}
                           <div 
+                            ref={(node) => {
+                              overlayRef.current = node;
+                              drop(node);
+                            }}
                             className="absolute inset-0" 
                             style={{ 
                               zIndex: 10, 
-                              pointerEvents: 'none',
+                              pointerEvents: 'auto',
                               position: 'absolute',
                               top: 0,
                               left: 0,
@@ -389,9 +403,11 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                               }
                             };
                             
-                            // Use percentage-based positioning - these percentages are relative to containerRef
-                            const leftPercent = field.xPercent !== undefined ? field.xPercent : (field.x / 800) * 100;
-                            const topPercent = field.yPercent !== undefined ? field.yPercent : (field.y / 600) * 100;
+                            // Use percentage-based positioning and sizing
+                            const leftPercent = field.xPercent ?? 0;
+                            const topPercent = field.yPercent ?? 0;
+                            const widthPercent = field.widthPercent ?? 25;
+                            const heightPercent = field.heightPercent ?? 6;
                             
                             return (
                               <div
@@ -400,8 +416,8 @@ const PDFViewer = ({ file, onFieldAdd, fields = [], onFieldUpdate, onFieldDelete
                                 style={{
                                   left: `${leftPercent}%`,
                                   top: `${topPercent}%`,
-                                  width: field.width || 200,
-                                  height: field.height || 40,
+                                  width: `${widthPercent}%`,
+                                  height: `${heightPercent}%`,
                                   zIndex: 20,
                                   pointerEvents: 'auto'
                                 }}
