@@ -32,7 +32,12 @@ export const AuthProvider = ({ children }) => {
         password: 'admin123',
         name: 'Admin User',
         role: 'admin',
-        department: 'IT Administration'
+        department: 'IT Administration',
+        accounts: [
+          { id: 'ACC-001', name: 'Corporate Banking Division', code: 'CBD-001' },
+          { id: 'ACC-002', name: 'Enterprise IT Services', code: 'EIS-002' },
+          { id: 'ACC-003', name: 'Executive Management', code: 'EM-003' }
+        ]
       },
       {
         id: 2,
@@ -40,7 +45,12 @@ export const AuthProvider = ({ children }) => {
         password: 'user123',
         name: 'John Smith',
         role: 'user',
-        department: 'Commercial Banking'
+        department: 'Commercial Banking',
+        accounts: [
+          { id: 'ACC-101', name: 'Commercial Lending - North Region', code: 'CL-NR-101' },
+          { id: 'ACC-102', name: 'Small Business Banking', code: 'SBB-102' },
+          { id: 'ACC-103', name: 'Regional Operations', code: 'RO-103' }
+        ]
       },
       {
         id: 3,
@@ -48,7 +58,11 @@ export const AuthProvider = ({ children }) => {
         password: 'manager123',
         name: 'Sarah Johnson',
         role: 'user',
-        department: 'Risk Management'
+        department: 'Risk Management',
+        accounts: [
+          { id: 'ACC-201', name: 'Credit Risk Analysis', code: 'CRA-201' },
+          { id: 'ACC-202', name: 'Compliance Monitoring', code: 'CM-202' }
+        ]
       }
     ];
 

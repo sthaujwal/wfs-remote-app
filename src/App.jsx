@@ -9,6 +9,7 @@ import TransactionCreate from './components/TransactionCreate';
 import TransactionView from './components/TransactionView';
 import AdminPanel from './components/AdminPanel';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { BrandingProvider } from './contexts/BrandingContext';
 import './App.css';
 
 function AppRoutes() {
@@ -17,7 +18,7 @@ function AppRoutes() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-wells-fargo-red"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderColor: 'var(--theme-primary)' }}></div>
       </div>
     );
   }
@@ -45,13 +46,15 @@ function AppRoutes() {
 function App() {
   return (
     <DndProvider backend={HTML5Backend}>
-      <AuthProvider>
-        <Router>
-          <div className="App">
-            <AppRoutes />
-          </div>
-        </Router>
-      </AuthProvider>
+      <BrandingProvider>
+        <AuthProvider>
+          <Router>
+            <div className="App">
+              <AppRoutes />
+            </div>
+          </Router>
+        </AuthProvider>
+      </BrandingProvider>
     </DndProvider>
   );
 }

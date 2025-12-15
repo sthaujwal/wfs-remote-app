@@ -17,7 +17,10 @@ import {
   Trash2,
   Hash,
   Database,
-  Tag
+  Tag,
+  FileSignature,
+  PenTool,
+  CheckCircle2
 } from 'lucide-react';
 
 const TransactionCreate = () => {
@@ -36,6 +39,10 @@ const TransactionCreate = () => {
     accountIds: '',
     systemOfRecord: '',
     customAttributes: []
+  });
+  const [icmpDocument, setIcmpDocument] = useState({
+    attributes: [], // [{id, key, value}]
+    relationships: [] // [{id, type: 'ACCT'|'CUST', accountNumber?, systemOfRecord?, customerRecipientId?}]
   });
 
   const handleFileUpload = (event) => {
@@ -81,6 +88,10 @@ const TransactionCreate = () => {
   };
 
   const addRecipient = () => {
+    // Calculate the next available order number
+    const maxOrder = recipients.length > 0 
+      ? Math.max(...recipients.map(r => r.order || 0))
+      : 0;
     const newRecipient = {
       id: Date.now(),
       name: '',
@@ -88,7 +99,7 @@ const TransactionCreate = () => {
       uniqueId: '',
       type: 'team-member', // 'team-member' or 'customer'
       role: 'signer',
-      order: recipients.length + 1,
+      order: maxOrder + 1,
       showSearch: true // Show search initially
     };
     setRecipients([...recipients, newRecipient]);
@@ -101,13 +112,69 @@ const TransactionCreate = () => {
   };
 
   const removeRecipient = (id) => {
-    setRecipients(recipients.filter(recipient => recipient.id !== id));
+    const removedRecipient = recipients.find(r => r.id === id);
+    const updatedRecipients = recipients.filter(recipient => recipient.id !== id);
+    
+    // Reorder remaining recipients if needed
+    if (removedRecipient && removedRecipient.order) {
+      const reordered = updatedRecipients.map(r => {
+        if (r.order && r.order > removedRecipient.order) {
+          return { ...r, order: r.order - 1 };
+        }
+        return r;
+      });
+      setRecipients(reordered);
+    } else {
+      setRecipients(updatedRecipients);
+    }
+  };
+
+  const handleOrderChange = (id, newOrder) => {
+    const recipient = recipients.find(r => r.id === id);
+    if (!recipient) return;
+
+    const orderNum = parseInt(newOrder);
+    const currentOrder = recipient.order || 0;
+
+    // If order is the same, no change needed
+    if (orderNum === currentOrder) return;
+
+    // Find if another recipient has this order
+    const conflictingRecipient = recipients.find(r => r.id !== id && r.order === orderNum);
+
+    if (conflictingRecipient) {
+      // Swap orders
+      const updated = recipients.map(r => {
+        if (r.id === id) {
+          return { ...r, order: orderNum };
+        } else if (r.id === conflictingRecipient.id) {
+          return { ...r, order: currentOrder };
+        }
+        return r;
+      });
+      setRecipients(updated);
+    } else {
+      // Just update this recipient's order
+      updateRecipient(id, { order: orderNum });
+    }
   };
 
   const handleRecipientSearchSelect = (id, recipientData) => {
+    const recipient = recipients.find(r => r.id === id);
+    const currentOrder = recipient?.order;
+    
+    // If recipient doesn't have an order and is a signer, assign one
+    let order = currentOrder;
+    if (!order && recipientData.role === 'signer') {
+      const signers = recipients.filter(r => r.role === 'signer' && r.id !== id);
+      const maxOrder = signers.length > 0 ? Math.max(...signers.map(r => r.order || 0)) : 0;
+      order = maxOrder + 1;
+    }
+    
     updateRecipient(id, {
       ...recipientData,
       role: 'signer', // Default role
+      order: order,
       showSearch: false // Hide search after selection
     });
   };
@@ -131,6 +198,7 @@ const TransactionCreate = () => {
       file: uploadedFile,
       fields,
       recipients,
+      icmpDocument,
       status: 'pending',
       createdDate: new Date().toISOString()
     };
@@ -150,10 +218,28 @@ const TransactionCreate = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="wells-fargo-card p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Create New Transaction</h1>
-        <p className="text-gray-600 mt-1">Set up a new electronic signature transaction</p>
+      {/* Header - Enhanced with eSigning visuals */}
+      <div className="wells-fargo-card p-6 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-500/5 to-yellow-400/5 rounded-full blur-3xl"></div>
+        <div className="relative flex items-center space-x-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-yellow-400/20 rounded-xl blur-md"></div>
+            <div className="relative bg-gradient-to-br from-white to-gray-50 p-4 rounded-xl border-2 border-gray-200 shadow-lg">
+              <FileSignature className="h-10 w-10" style={{ color: 'var(--theme-primary)' }} />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center space-x-2">
+              <span>Create New Transaction</span>
+              <PenTool className="h-6 w-6 text-gray-400" />
+            </h1>
+            <p className="text-gray-600 mt-1.5 flex items-center space-x-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Set up a new electronic signature transaction</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Progress Steps */}
@@ -416,6 +502,12 @@ const TransactionCreate = () => {
                     <span>{rec.name}</span>
                     <span className="text-gray-400">•</span>
                     <span className="text-gray-500 capitalize">{rec.role}</span>
+                    {rec.role === 'signer' && rec.order && (
+                      <>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-500">Order: {rec.order}</span>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -577,15 +669,44 @@ const TransactionCreate = () => {
                             <p className="text-xs text-gray-500 truncate">{recipient.email}</p>
                           </div>
                         </div>
-                        <select
-                          value={recipient.role}
-                          onChange={(e) => updateRecipient(recipient.id, { role: e.target.value })}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-wells-fargo-red/20 focus:border-wells-fargo-red"
-                        >
-                          <option value="signer">Signer</option>
-                          <option value="reviewer">Reviewer</option>
-                          <option value="approver">Approver</option>
-                        </select>
+                        <div className="flex items-center space-x-2">
+                          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Role:</label>
+                          <select
+                            value={recipient.role}
+                            onChange={(e) => {
+                              const newRole = e.target.value;
+                              if (newRole === 'signer' && !recipient.order) {
+                                // Assign order if becoming a signer without one
+                                const signers = recipients.filter(r => r.role === 'signer' && r.id !== recipient.id);
+                                const maxOrder = signers.length > 0 ? Math.max(...signers.map(r => r.order || 0)) : 0;
+                                updateRecipient(recipient.id, { role: newRole, order: maxOrder + 1 });
+                              } else {
+                                updateRecipient(recipient.id, { role: newRole });
+                              }
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-wells-fargo-red/20 focus:border-wells-fargo-red"
+                          >
+                            <option value="signer">Signer</option>
+                            <option value="reviewer">Reviewer</option>
+                            <option value="approver">Approver</option>
+                          </select>
+                        </div>
+                        {recipient.role === 'signer' && (
+                          <div className="flex items-center space-x-2">
+                            <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Order:</label>
+                            <select
+                              value={recipient.order || 1}
+                              onChange={(e) => handleOrderChange(recipient.id, e.target.value)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-wells-fargo-red/20 focus:border-wells-fargo-red min-w-[60px]"
+                            >
+                              {Array.from({ length: Math.max(recipients.filter(r => r.role === 'signer').length, 1) }, (_, i) => i + 1).map((num) => (
+                                <option key={num} value={num}>
+                                  {num}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <button
                           onClick={() => toggleRecipientSearch(recipient.id)}
                           className="ml-2 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -694,6 +815,194 @@ const TransactionCreate = () => {
             )}
           </div>
           
+          {/* ICMP Document: Attributes & Relationships */}
+          <div className="mt-8 space-y-8">
+            {/* Attributes */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-md font-semibold text-gray-900">ICMP Document Attributes</h3>
+                <button
+                  type="button"
+                  onClick={() => setIcmpDocument({
+                    ...icmpDocument,
+                    attributes: [...icmpDocument.attributes, { id: Date.now(), key: '', value: '' }]
+                  })}
+                  className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-wells-fargo-red hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add Attribute</span>
+                </button>
+              </div>
+              {icmpDocument.attributes.length === 0 ? (
+                <div className="p-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-center">
+                  <p className="text-sm text-gray-500">No attributes added</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {icmpDocument.attributes.map(attr => (
+                    <div key={attr.id} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <input
+                        type="text"
+                        value={attr.key}
+                        onChange={(e) => {
+                          const updated = icmpDocument.attributes.map(a => a.id === attr.id ? { ...a, key: e.target.value } : a);
+                          setIcmpDocument({ ...icmpDocument, attributes: updated });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-wells-fargo-red focus:border-transparent text-sm"
+                        placeholder="Attribute key"
+                      />
+                      <span className="text-gray-400">:</span>
+                      <input
+                        type="text"
+                        value={attr.value}
+                        onChange={(e) => {
+                          const updated = icmpDocument.attributes.map(a => a.id === attr.id ? { ...a, value: e.target.value } : a);
+                          setIcmpDocument({ ...icmpDocument, attributes: updated });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-wells-fargo-red focus:border-transparent text-sm"
+                        placeholder="Attribute value"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = icmpDocument.attributes.filter(a => a.id !== attr.id);
+                          setIcmpDocument({ ...icmpDocument, attributes: filtered });
+                        }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove attribute"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Relationships */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-md font-semibold text-gray-900">ICMP Relationships</h3>
+                <button
+                  type="button"
+                  onClick={() => setIcmpDocument({
+                    ...icmpDocument,
+                    relationships: [
+                      ...icmpDocument.relationships,
+                      { id: Date.now(), type: 'ACCT', accountNumber: '', systemOfRecord: '', customerRecipientId: '' }
+                    ]
+                  })}
+                  className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-wells-fargo-red hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add Relationship</span>
+                </button>
+              </div>
+
+              {icmpDocument.relationships.length === 0 ? (
+                <div className="p-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-center">
+                  <p className="text-sm text-gray-500">No relationships added</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {icmpDocument.relationships.map(rel => (
+                    <div key={rel.id} className="p-4 bg-white rounded-xl border-2 border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <label className="text-sm font-medium text-gray-700">Type</label>
+                          <select
+                            value={rel.type}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const updated = icmpDocument.relationships.map(r => r.id === rel.id
+                                ? value === 'ACCT'
+                                  ? { id: r.id, type: 'ACCT', accountNumber: '', systemOfRecord: '' }
+                                  : { id: r.id, type: 'CUST', customerRecipientId: '' }
+                                : r);
+                              setIcmpDocument({ ...icmpDocument, relationships: updated });
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-wells-fargo-red focus:border-transparent"
+                          >
+                            <option value="ACCT">ACCT</option>
+                            <option value="CUST">CUST</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const filtered = icmpDocument.relationships.filter(r => r.id !== rel.id);
+                            setIcmpDocument({ ...icmpDocument, relationships: filtered });
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                          title="Remove relationship"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Conditional content by type */}
+                      {rel.type === 'ACCT' ? (
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Account Number</label>
+                            <input
+                              type="text"
+                              value={rel.accountNumber || ''}
+                              onChange={(e) => {
+                                const updated = icmpDocument.relationships.map(r => r.id === rel.id ? { ...r, accountNumber: e.target.value } : r);
+                                setIcmpDocument({ ...icmpDocument, relationships: updated });
+                              }}
+                              className="form-field w-full"
+                              placeholder="Enter account number"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">System Of Record</label>
+                            <input
+                              type="text"
+                              value={rel.systemOfRecord || ''}
+                              onChange={(e) => {
+                                const updated = icmpDocument.relationships.map(r => r.id === rel.id ? { ...r, systemOfRecord: e.target.value } : r);
+                                setIcmpDocument({ ...icmpDocument, relationships: updated });
+                              }}
+                              className="form-field w-full"
+                              placeholder="Enter SOR (e.g., SAP)"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3">
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Customer Recipient</label>
+                          <select
+                            value={rel.customerRecipientId || ''}
+                            onChange={(e) => {
+                              const updated = icmpDocument.relationships.map(r => r.id === rel.id ? { ...r, customerRecipientId: e.target.value } : r);
+                              setIcmpDocument({ ...icmpDocument, relationships: updated });
+                            }}
+                            className="form-field w-full"
+                          >
+                            <option value="">Select a customer recipient</option>
+                            {recipients
+                              .filter(r => r.type === 'customer')
+                              .map(cr => (
+                                <option key={cr.id} value={String(cr.id)}>{cr.name || cr.email || cr.uniqueId}</option>
+                              ))}
+                          </select>
+                          {rel.customerRecipientId && (
+                            <p className="text-xs text-gray-500 mt-2">Selected: {(() => {
+                              const cr = recipients.find(r => String(r.id) === String(rel.customerRecipientId));
+                              return cr ? `${cr.name || cr.email} (${cr.type === 'customer' ? 'Customer' : ''})` : 'Unknown';
+                            })()}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="mt-6 flex justify-between">
             <button
               onClick={() => setStep(2)}
@@ -850,6 +1159,15 @@ const TransactionCreate = () => {
                   <span className="text-gray-600">Recipients:</span>
                   <span className="font-medium">{recipients.length}</span>
                 </div>
+                {/* ICMP quick counts */}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">ICMP Attributes:</span>
+                  <span className="font-medium">{icmpDocument.attributes.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">ICMP Relationships:</span>
+                  <span className="font-medium">{icmpDocument.relationships.length}</span>
+                </div>
               </div>
             </div>
 
@@ -873,13 +1191,58 @@ const TransactionCreate = () => {
                         </div>
                         <p className="text-xs text-gray-500 truncate">{recipient.email}</p>
                       </div>
+                      </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-gray-500 capitalize">{recipient.role}</span>
+                      {recipient.role === 'signer' && recipient.order && (
+                        <span className="text-xs text-gray-400 mt-0.5">Order: {recipient.order}</span>
+                      )}
                     </div>
-                    <span className="text-xs text-gray-500 capitalize">{recipient.role}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
+
+          {/* ICMP Details */}
+          {(icmpDocument.attributes.length > 0 || icmpDocument.relationships.length > 0) && (
+            <div className="wells-fargo-card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">ICMP Document</h3>
+              {icmpDocument.attributes.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Attributes</h4>
+                  <div className="space-y-2">
+                    {icmpDocument.attributes.map(attr => (
+                      <div key={attr.id} className="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span className="text-sm font-semibold text-gray-700 min-w-[120px]">{attr.key || '(empty key)'}</span>
+                        <span className="text-gray-400">:</span>
+                        <span className="text-sm text-gray-900 flex-1">{attr.value || '(empty value)'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {icmpDocument.relationships.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Relationships</h4>
+                  <div className="space-y-2">
+                    {icmpDocument.relationships.map(rel => (
+                      <div key={rel.id} className="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Type: {rel.type}</span>
+                          {rel.type === 'ACCT' ? (
+                            <span className="text-xs text-gray-500">Account: {rel.accountNumber || '(missing)'} • SOR: {rel.systemOfRecord || '(missing)'}</span>
+                          ) : (
+                            <span className="text-xs text-gray-500">Customer: {(() => { const cr = recipients.find(r => String(r.id) === String(rel.customerRecipientId)); return cr ? (cr.name || cr.email || cr.uniqueId) : '(not selected)'; })()}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="wells-fargo-card p-6">

@@ -18,7 +18,7 @@ import {
   Loader
 } from 'lucide-react';
 
-// Set up PDF.js worker - using public directory for Vite
+// PDF.js worker: serve from public to avoid dynamic ESM import issues in Vite
 if (typeof window !== 'undefined' && 'Worker' in window) {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }

@@ -1,39 +1,177 @@
 /* App specific styles */
 .App {
   min-height: 100vh;
-  background-color: #f8fafc;
+  background: var(--theme-background-gradient, linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%));
+  background-attachment: fixed;
 }
 
 /* Main layout container */
 .layout-container {
   display: flex;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: var(--theme-background, #f8fafc);
 }
 
-/* Wells Fargo branding */
+/* Wells Fargo Top Banner */
+.wells-fargo-banner,
+.ps-masthead {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #D71E2B;
+  width: 100%;
+  display: block;
+}
+
+.ps-masthead-wrapper {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.new_logoOuter {
+  display: flex;
+  align-items: center;
+}
+
+.ps-logo-home {
+  display: flex;
+  align-items: center;
+}
+
+.ps-logo-home img {
+  height: 23px;
+  width: auto;
+}
+
+.ps-right-nav {
+  display: flex;
+  align-items: center;
+}
+
+.ps-right-nav ul {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 1.5rem;
+}
+
+.ps-right-nav li {
+  display: flex;
+  align-items: center;
+}
+
+.ps-search-item {
+  display: flex;
+  align-items: center;
+}
+
+.ps-nxgSearchIcon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-sign-on-item {
+  display: flex;
+  align-items: center;
+}
+
+.ps-masthead-sign-on {
+  display: flex;
+  align-items: center;
+}
+
+.ps-sign-on-text {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.ps-hamburger-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  gap: 0.25rem;
+}
+
+.ps-icon-bar {
+  width: 20px;
+  height: 2px;
+  background-color: white;
+  margin: 2px 0;
+  transition: all 0.3s ease;
+}
+
+@media (min-width: 1024px) {
+  .ps-hamburger-link {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .ps-right-nav ul li:not(.ps-search-item):not(.ps-sign-on-item) {
+    display: none;
+  }
+}
+
+/* Theme-aware header */
 .wells-fargo-header {
-  background: linear-gradient(135deg, var(--wells-fargo-red) 0%, var(--wells-fargo-dark-red) 100%);
+  background: var(--theme-button-gradient, linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-dark) 100%));
   color: white;
 }
 
-/* Card styles */
+/* Card styles - Enhanced */
 .wells-fargo-card {
-  background: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
-  transition: box-shadow 0.2s ease;
+  background: var(--theme-surface);
+  border-radius: var(--theme-card-border-radius, 1rem);
+  box-shadow: var(--theme-card-shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--theme-border);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.wells-fargo-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-secondary));
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .wells-fargo-card:hover {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-xl);
+  border-color: color-mix(in srgb, var(--theme-primary) 20%, transparent);
+  transform: translateY(-2px);
+}
+
+.wells-fargo-card:hover::before {
+  opacity: 1;
 }
 
 /* Status indicators */
 .status-pending {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: color-mix(in srgb, var(--theme-warning) 15%, white);
+  color: color-mix(in srgb, var(--theme-warning) 80%, black);
   padding: 0.25rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.75rem;
@@ -42,8 +180,8 @@
 }
 
 .status-in-progress {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: color-mix(in srgb, var(--theme-info) 15%, white);
+  color: color-mix(in srgb, var(--theme-info) 80%, black);
   padding: 0.25rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.75rem;
@@ -52,8 +190,8 @@
 }
 
 .status-completed {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: color-mix(in srgb, var(--theme-success) 15%, white);
+  color: color-mix(in srgb, var(--theme-success) 80%, black);
   padding: 0.25rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.75rem;
@@ -62,8 +200,8 @@
 }
 
 .status-rejected {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: color-mix(in srgb, var(--theme-error) 15%, white);
+  color: color-mix(in srgb, var(--theme-error) 80%, black);
   padding: 0.25rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.75rem;
@@ -138,24 +276,50 @@
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem 1rem;
   margin-bottom: 0.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: #6b7280;
+  position: relative;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--theme-primary);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.3s ease;
 }
 
 .nav-item:hover {
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: rgba(215, 30, 43, 0.08);
+  color: var(--theme-primary);
+  transform: translateX(4px);
+}
+
+.nav-item:hover::before {
+  height: 60%;
 }
 
 .nav-item.active {
-  background-color: var(--wells-fargo-red);
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-hover) 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(215, 30, 43, 0.2);
+}
+
+.nav-item.active::before {
+  height: 100%;
+  width: 4px;
+  background: white;
 }
 
 .nav-item .icon {
@@ -164,23 +328,25 @@
   height: 1rem;
 }
 
-/* Sidebar styles */
+/* Sidebar styles - Enhanced */
 .sidebar {
-  width: 16rem;
+  width: 17rem;
   background: white;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(229, 231, 235, 0.8);
   height: 100vh;
   overflow-y: auto;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
 }
 
 .sidebar-desktop {
   display: none;
-  width: 16rem;
+  width: 17rem;
   background: white;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(229, 231, 235, 0.8);
   height: 100vh;
   overflow-y: auto;
   flex-shrink: 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
 }
 
 .main-content-wrapper {
@@ -197,23 +363,29 @@
 }
 
 .sidebar-header {
-  padding: 1.25rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(250, 250, 250, 1) 100%);
 }
 
 .sidebar-nav {
   padding: 1.25rem 0.5rem;
 }
 
-/* Top navigation */
+/* Top navigation - Enhanced */
 .top-nav {
-  height: 4rem;
+  height: 4.5rem;
   background: white;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
   display: flex;
   align-items: center;
-  padding: 0 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 0 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .top-nav-content {
@@ -274,19 +446,25 @@
 
 .search-input {
   width: 100%;
-  padding: 0.5rem 0.75rem 0.5rem 2rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background-color: #f9fafb;
-  transition: all 0.2s ease;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  background-color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #111827;
+}
+
+.search-input:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: var(--wells-fargo-red);
+  border-color: var(--theme-primary);
   background-color: white;
-  box-shadow: 0 0 0 3px rgba(215, 30, 43, 0.1);
+  box-shadow: 0 0 0 4px rgba(215, 30, 43, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .search-input::placeholder {
@@ -321,7 +499,7 @@
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,8 +536,8 @@
 /* Main content area */
 .main-content {
   flex: 1;
-  padding: 1rem;
-  background-color: #f8fafc;
+  padding: 1.5rem;
+  background: transparent;
   min-height: calc(100vh - 4rem);
 }
 
@@ -380,12 +558,37 @@
 
 .stat-card {
   background: white;
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  padding: 1.75rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(229, 231, 235, 0.8);
   display: flex;
   align-items: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-secondary));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  border-color: rgba(215, 30, 43, 0.2);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
 }
 
 .stat-icon {
@@ -432,7 +635,7 @@
 
 .form-input:focus {
   outline: none;
-  border-color: var(--wells-fargo-red);
+  border-color: var(--theme-primary);
   box-shadow: 0 0 0 3px rgba(215, 30, 43, 0.1);
   background-color: white;
 }
@@ -450,7 +653,7 @@
 
 .form-textarea:focus {
   outline: none;
-  border-color: var(--wells-fargo-red);
+  border-color: var(--theme-primary);
   box-shadow: 0 0 0 3px rgba(215, 30, 43, 0.1);
   background-color: white;
 }
@@ -467,7 +670,7 @@
 
 .form-select:focus {
   outline: none;
-  border-color: var(--wells-fargo-red);
+  border-color: var(--theme-primary);
   box-shadow: 0 0 0 3px rgba(215, 30, 43, 0.1);
   background-color: white;
 }
@@ -483,7 +686,7 @@
   width: 1rem;
   height: 1rem;
   margin-right: 0.5rem;
-  accent-color: var(--wells-fargo-red);
+  accent-color: var(--theme-primary);
 }
 
 .checkbox-label {
@@ -550,14 +753,14 @@
 }
 
 .step-number.completed {
-  background-color: var(--wells-fargo-red);
-  border-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
+  border-color: var(--theme-primary);
   color: white;
 }
 
 .step-number.current {
-  border-color: var(--wells-fargo-red);
-  color: var(--wells-fargo-red);
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
 }
 
 .step-number.pending {
@@ -586,7 +789,7 @@
 }
 
 .step-connector.completed {
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
 }
 
 .step-connector.pending {
@@ -687,7 +890,7 @@
   justify-content: space-between;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
 }
 
 .chatbot-messages {
@@ -727,7 +930,7 @@
 }
 
 .chatbot-avatar.user {
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
 }
 
 .chatbot-avatar.bot {
@@ -740,7 +943,7 @@
 }
 
 .chatbot-bubble.user {
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
   color: white;
 }
 
@@ -785,13 +988,13 @@
   border-radius: 0.5rem;
   resize: none;
   focus: ring-2;
-  focus: ring-wells-fargo-red;
+  focus: ring-theme-primary;
   focus: border-transparent;
 }
 
 .chatbot-send-btn {
   padding: 0.75rem;
-  background-color: var(--wells-fargo-red);
+  background-color: var(--theme-primary);
   color: white;
   border-radius: 0.5rem;
   transition: background-color 0.2s;

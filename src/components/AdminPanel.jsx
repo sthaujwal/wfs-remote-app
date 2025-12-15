@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   Mail, 
@@ -9,11 +9,19 @@ import {
   Save,
   Plus,
   X,
-  Edit3
+  Edit3,
+  Palette,
+  Type,
+  Image as ImageIcon
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useBranding } from '../contexts/BrandingContext';
+import { saveBrandingForAccount } from '../services/brandingService';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('settings');
+  const { user } = useAuth();
+  const { branding, loadBranding } = useBranding();
   const [emailTemplates, setEmailTemplates] = useState([
     {
       id: 1,
@@ -55,11 +63,74 @@ const AdminPanel = () => {
 
   const tabs = [
     { id: 'settings', name: 'Account Settings', icon: Settings },
+    { id: 'branding', name: 'Branding', icon: Palette },
     { id: 'templates', name: 'Email Templates', icon: Mail },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'users', name: 'User Management', icon: Users },
     { id: 'security', name: 'Security', icon: Shield }
   ];
+
+  // Branding form state
+  const [brandingForm, setBrandingForm] = useState(null);
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingSaveMessage, setBrandingSaveMessage] = useState('');
+
+  // Initialize branding form with current branding
+  useEffect(() => {
+    if (branding && activeTab === 'branding') {
+      setBrandingForm({
+        id: branding.id || '',
+        name: branding.name || '',
+        colors: {
+          primary: branding.colors?.primary || '#D71E2B',
+          secondary: branding.colors?.secondary || '#FFB81C',
+          primaryDark: branding.colors?.primaryDark || '#A01A23',
+          primaryHover: branding.colors?.primaryHover || '#B81E2A',
+          background: branding.colors?.background || '#f8fafc',
+          backgroundGradient: branding.colors?.backgroundGradient || 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          surface: branding.colors?.surface || '#FFFFFF',
+          textPrimary: branding.colors?.textPrimary || '#1f2937',
+          textSecondary: branding.colors?.textSecondary || '#6b7280',
+          border: branding.colors?.border || '#e5e7eb',
+          success: branding.colors?.success || '#059669',
+          warning: branding.colors?.warning || '#D97706',
+          error: branding.colors?.error || '#DC2626',
+          info: branding.colors?.info || '#2563EB',
+        },
+        fonts: {
+          primary: branding.fonts?.primary || '',
+          body: branding.fonts?.body || '',
+          googleFontsUrl: branding.fonts?.googleFontsUrl || '',
+        },
+        logos: {
+          main: branding.logos?.main || '',
+          favicon: branding.logos?.favicon || '',
+          loginLogo: branding.logos?.loginLogo || '',
+          sidebarLogo: branding.logos?.sidebarLogo || '',
+        },
+        components: {
+          button: {
+            borderRadius: branding.components?.button?.borderRadius || '0.75rem',
+            shadow: branding.components?.button?.shadow || '',
+            gradient: branding.components?.button?.gradient || '',
+          },
+          card: {
+            borderRadius: branding.components?.card?.borderRadius || '1rem',
+            shadow: branding.components?.card?.shadow || '',
+          },
+          input: {
+            borderRadius: branding.components?.input?.borderRadius || '0.5rem',
+            focusRing: branding.components?.input?.focusRing || '',
+          },
+        },
+        metadata: {
+          appName: branding.metadata?.appName || '',
+          footerText: branding.metadata?.footerText || '',
+          loginTitle: branding.metadata?.loginTitle || '',
+        },
+      });
+    }
+  }, [branding, activeTab]);
 
   const handleEmailTemplateUpdate = (id, updates) => {
     setEmailTemplates(templates => 
@@ -88,6 +159,50 @@ const AdminPanel = () => {
     alert('Settings saved successfully!');
   };
 
+  const handleBrandingChange = (path, value) => {
+    if (!brandingForm) return;
+    
+    const keys = path.split('.');
+    const newForm = { ...brandingForm };
+    let current = newForm;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      current[keys[i]] = { ...current[keys[i]] };
+      current = current[keys[i]];
+    }
+    
+    current[keys[keys.length - 1]] = value;
+    setBrandingForm(newForm);
+  };
+
+  const saveBranding = async () => {
+    if (!brandingForm || !user?.accounts || user.accounts.length === 0) {
+      alert('No account selected or branding form not initialized');
+      return;
+    }
+
+    setSavingBranding(true);
+    setBrandingSaveMessage('');
+
+    try {
+      // Get the currently selected account (you might want to add account selection in the form)
+      const selectedAccount = user.accounts[0]; // For now, use first account
+      
+      const savedBranding = await saveBrandingForAccount(selectedAccount, brandingForm);
+      
+      // Reload branding to apply changes
+      await loadBranding(selectedAccount);
+      
+      setBrandingSaveMessage('Branding saved successfully! Changes are now live.');
+      setTimeout(() => setBrandingSaveMessage(''), 5000);
+    } catch (error) {
+      setBrandingSaveMessage(`Error saving branding: ${error.message}`);
+      setTimeout(() => setBrandingSaveMessage(''), 5000);
+    } finally {
+      setSavingBranding(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,9 +224,10 @@ const AdminPanel = () => {
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                       activeTab === tab.id
-                        ? 'bg-wells-fargo-red text-white'
+                        ? 'text-white'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
+                    style={activeTab === tab.id ? { backgroundColor: 'var(--theme-primary)' } : {}}
                   >
                     <Icon className="h-4 w-4 mr-3" />
                     {tab.name}
@@ -124,6 +240,349 @@ const AdminPanel = () => {
 
         {/* Main Content */}
         <div className="lg:col-span-3">
+          {/* Branding Management */}
+          {activeTab === 'branding' && brandingForm && (
+            <div className="space-y-6">
+              <div className="wells-fargo-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Branding Configuration</h2>
+                    <p className="text-sm text-gray-500 mt-1">Customize your application's appearance and branding</p>
+                  </div>
+                  {brandingSaveMessage && (
+                    <div className={`px-4 py-2 rounded-md text-sm ${
+                      brandingSaveMessage.includes('Error') 
+                        ? 'bg-red-50 text-red-800' 
+                        : 'bg-green-50 text-green-800'
+                    }`}>
+                      {brandingSaveMessage}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-8">
+                  {/* Basic Information */}
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <FileText className="h-5 w-5 mr-2" style={{ color: 'var(--theme-primary)' }} />
+                      Basic Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Branding Name
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.name}
+                          onChange={(e) => handleBrandingChange('name', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="e.g., Wells Fargo Core"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          App Name
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.metadata.appName}
+                          onChange={(e) => handleBrandingChange('metadata.appName', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="Application name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Login Title
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.metadata.loginTitle}
+                          onChange={(e) => handleBrandingChange('metadata.loginTitle', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="Login page title"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Footer Text
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.metadata.footerText}
+                          onChange={(e) => handleBrandingChange('metadata.footerText', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="Copyright text"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Colors */}
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <Palette className="h-5 w-5 mr-2" style={{ color: 'var(--theme-primary)' }} />
+                      Colors
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {Object.entries(brandingForm.colors).map(([key, value]) => (
+                        <div key={key}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
+                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={value.startsWith('#') ? value : '#000000'}
+                              onChange={(e) => handleBrandingChange(`colors.${key}`, e.target.value)}
+                              className="h-10 w-20 rounded border border-gray-300 cursor-pointer"
+                              disabled={key === 'backgroundGradient'}
+                            />
+                            <input
+                              type="text"
+                              value={value}
+                              onChange={(e) => handleBrandingChange(`colors.${key}`, e.target.value)}
+                              className="form-field flex-1"
+                              placeholder={key === 'backgroundGradient' ? 'CSS gradient' : '#hexcolor'}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fonts */}
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <Type className="h-5 w-5 mr-2" style={{ color: 'var(--theme-primary)' }} />
+                      Typography
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Primary Font (Headings)
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.fonts.primary}
+                          onChange={(e) => handleBrandingChange('fonts.primary', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="e.g., 'Playfair Display', serif"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Body Font
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.fonts.body}
+                          onChange={(e) => handleBrandingChange('fonts.body', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="e.g., 'Inter', sans-serif"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Google Fonts URL
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.fonts.googleFontsUrl}
+                          onChange={(e) => handleBrandingChange('fonts.googleFontsUrl', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="https://fonts.googleapis.com/css2?family=..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logos */}
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <ImageIcon className="h-5 w-5 mr-2" style={{ color: 'var(--theme-primary)' }} />
+                      Logos & Images
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Main Logo URL
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.logos.main}
+                          onChange={(e) => handleBrandingChange('logos.main', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="/logos/main.svg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Favicon URL
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.logos.favicon}
+                          onChange={(e) => handleBrandingChange('logos.favicon', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="/favicons/favicon.ico"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Login Logo URL
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.logos.loginLogo}
+                          onChange={(e) => handleBrandingChange('logos.loginLogo', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="/logos/login.svg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Sidebar Logo URL
+                        </label>
+                        <input
+                          type="text"
+                          value={brandingForm.logos.sidebarLogo}
+                          onChange={(e) => handleBrandingChange('logos.sidebarLogo', e.target.value)}
+                          className="form-field w-full"
+                          placeholder="/logos/sidebar.svg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Component Styles */}
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <Settings className="h-5 w-5 mr-2" style={{ color: 'var(--theme-primary)' }} />
+                      Component Styles
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Button Styles</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Border Radius
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.button.borderRadius}
+                              onChange={(e) => handleBrandingChange('components.button.borderRadius', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="0.75rem"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Shadow
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.button.shadow}
+                              onChange={(e) => handleBrandingChange('components.button.shadow', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="0 4px 12px rgba(...)"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Gradient
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.button.gradient}
+                              onChange={(e) => handleBrandingChange('components.button.gradient', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="linear-gradient(...)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Card Styles</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Border Radius
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.card.borderRadius}
+                              onChange={(e) => handleBrandingChange('components.card.borderRadius', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="1rem"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Shadow
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.card.shadow}
+                              onChange={(e) => handleBrandingChange('components.card.shadow', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="0 4px 6px rgba(...)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Input Styles</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Border Radius
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.input.borderRadius}
+                              onChange={(e) => handleBrandingChange('components.input.borderRadius', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="0.5rem"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Focus Ring Color
+                            </label>
+                            <input
+                              type="text"
+                              value={brandingForm.components.input.focusRing}
+                              onChange={(e) => handleBrandingChange('components.input.focusRing', e.target.value)}
+                              className="form-field w-full"
+                              placeholder="rgba(215, 30, 43, 0.1)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4 border-t border-gray-200">
+                    <button
+                      onClick={saveBranding}
+                      disabled={savingBranding}
+                      className="wells-fargo-button flex items-center space-x-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      <span>{savingBranding ? 'Saving...' : 'Save Branding'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Account Settings */}
           {activeTab === 'settings' && (
             <div className="wells-fargo-card p-6">
